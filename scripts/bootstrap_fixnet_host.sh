@@ -8,6 +8,7 @@ UPSTREAM_REPO="https://github.com/kynesyslabs/node.git"
 PUBLIC_URL=""
 IDENTITY_FILE=""
 DISABLE_MONITORING=false
+HOST_MODE=""
 MONITORING_PROFILE="basic"
 METRICS_PORT="9090"
 PROMETHEUS_PORT="9091"
@@ -27,6 +28,7 @@ Run as root on the target host.
 
 Required:
   --public-url http://<public-ip-or-dns>:53550
+  --fresh-host | --reuse-host
 
 Optional:
   --user demos
@@ -48,6 +50,7 @@ Optional:
 
 Notes:
   - This script assumes one DEMOS node per host.
+  - You must choose either --fresh-host or --reuse-host.
   - It installs Bun and Rust/Cargo for the service user if needed.
   - If no identity file is supplied, it performs a first boot to generate one,
     backs it up under ~/.secrets, then switches into fixnet mode.
@@ -80,6 +83,14 @@ while [[ $# -gt 0 ]]; do
 	--identity-file)
 		IDENTITY_FILE="${2:-}"
 		shift 2
+		;;
+	--fresh-host)
+		HOST_MODE="fresh"
+		shift
+		;;
+	--reuse-host)
+		HOST_MODE="reuse"
+		shift
 		;;
 	--monitoring-profile)
 		MONITORING_PROFILE="${2:-}"
@@ -142,6 +153,11 @@ if [[ -z "${PUBLIC_URL}" ]]; then
 	exit 1
 fi
 
+if [[ -z "${HOST_MODE}" ]]; then
+	echo "Choose exactly one of --fresh-host or --reuse-host" >&2
+	exit 1
+fi
+
 if [[ "${MONITORING_PROFILE}" != "basic" && "${MONITORING_PROFILE}" != "full" ]]; then
 	echo "--monitoring-profile must be 'basic' or 'full'" >&2
 	exit 1
@@ -159,6 +175,46 @@ FIRST_RUN_PID="${HOME_DIR}/first-run.pid"
 
 user_shell() {
 	sudo -u "${USER_NAME}" -H bash -lc "$*"
+}
+
+service_exists() {
+	systemctl list-unit-files demos-node.service --no-legend 2>/dev/null | grep -q '^demos-node\.service'
+}
+
+assert_fresh_host() {
+	local residue=0
+
+	if service_exists; then
+		echo "Fresh-host check failed: demos-node.service already exists" >&2
+		residue=1
+	fi
+
+	if [[ -e "${REPO_DIR}" ]]; then
+		echo "Fresh-host check failed: repo path already exists at ${REPO_DIR}" >&2
+		residue=1
+	fi
+
+	if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Eq '^(postgres_5332|tlsn-notary-7047|demos-prometheus|demos-grafana|demos-node-exporter)$'; then
+		echo "Fresh-host check failed: DEMOS-related Docker containers already exist" >&2
+		residue=1
+	fi
+
+	if [[ "${residue}" -ne 0 ]]; then
+		echo "Use --reuse-host if you intend to replace an existing install." >&2
+		exit 1
+	fi
+}
+
+cleanup_existing_install() {
+	if service_exists; then
+		systemctl stop demos-node.service >/dev/null 2>&1 || true
+		systemctl disable demos-node.service >/dev/null 2>&1 || true
+	fi
+
+	rm -f /etc/systemd/system/demos-node.service
+	systemctl daemon-reload >/dev/null 2>&1 || true
+	cleanup_runtime_artifacts
+	rm -rf "${REPO_DIR}"
 }
 
 ensure_base_packages() {
@@ -219,7 +275,6 @@ ensure_rust() {
 }
 
 ensure_repo() {
-	rm -rf "${REPO_DIR}"
 	install -d -m 755 -o "${USER_NAME}" -g "${USER_NAME}" "$(dirname "${REPO_DIR}")"
 	user_shell "git clone ${UPSTREAM_REPO} ${REPO_DIR}"
 	user_shell "cd ${REPO_DIR} && git checkout ${BRANCH}"
@@ -344,6 +399,12 @@ EOF
 	systemctl daemon-reload
 	systemctl enable --now demos-node.service
 }
+
+if [[ "${HOST_MODE}" == "fresh" ]]; then
+	assert_fresh_host
+else
+	cleanup_existing_install
+fi
 
 ensure_base_packages
 ensure_docker

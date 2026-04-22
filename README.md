@@ -4,7 +4,10 @@ Public, provider-neutral companion repo for bringing a fresh Linux host onto the
 
 This repo is intentionally small. It does not contain any tenant inventory, provider API automation, live IP addresses, or mnemonic material. It only contains the reusable operator layer:
 
+- a one-command VPS setup wrapper
+- a remote preflight checker
 - a host bootstrap script
+- a post-bootstrap verifier
 - a short burn-in monitor
 - upstream-aligned monitoring support with optional full profile
 - generalized runbooks for VPS and local-host usage
@@ -15,12 +18,13 @@ This repo is intentionally small. It does not contain any tenant inventory, prov
 It helps you:
 
 1. prepare one host per node
-2. clone the upstream DEMOS node
-3. restore an existing mnemonic or generate a fresh one
-4. configure fixnet mode
-5. install a systemd service
-6. verify `/info`
-7. run a short burn-in check
+2. preflight-check the target host
+3. clone the upstream DEMOS node
+4. restore an existing mnemonic or generate a fresh one
+5. configure fixnet mode
+6. install a systemd service
+7. verify `/info`
+8. run a short burn-in check
 
 ## What This Repo Does Not Do
 
@@ -46,10 +50,20 @@ Shortest path:
 
 ### VPS host
 
-Run the bootstrap script on a fresh Ubuntu host as `root`:
+Preferred path from your admin machine:
 
 ```bash
-ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550' < scripts/bootstrap_fixnet_host.sh
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host
+```
+
+Direct bootstrap is still available if you want to run the steps manually:
+
+```bash
+ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550 --fresh-host' < scripts/bootstrap_fixnet_host.sh
 ```
 
 If you already have a mnemonic on the host:
@@ -57,6 +71,7 @@ If you already have a mnemonic on the host:
 ```bash
 ssh root@<host> 'bash -s -- \
   --public-url http://<public-ip-or-dns>:53550 \
+  --reuse-host \
   --identity-file /home/demos/.secrets/demos-mnemonic' < scripts/bootstrap_fixnet_host.sh
 ```
 
@@ -65,6 +80,7 @@ If you want the upstream full monitoring profile with `node-exporter`:
 ```bash
 ssh root@<host> 'bash -s -- \
   --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
   --monitoring-profile full \
   --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
 ```
@@ -91,6 +107,8 @@ ssh root@<host> 'bash -s -- \
 
 - one host per node
 - one mnemonic per node
+- use `setup_fixnet_vps.sh` unless you intentionally want manual control
+- `--fresh-host` fails fast on residue, `--reuse-host` intentionally replaces an existing install
 - SSH key auth only
 - keep mnemonics outside git
 - allow `20-30` seconds after restart before treating `/info` as unhealthy

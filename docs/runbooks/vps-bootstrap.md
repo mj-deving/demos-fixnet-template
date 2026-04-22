@@ -13,21 +13,51 @@ Allow inbound:
 
 ## Bootstrap
 
-Run as `root` on the target host:
+Recommended path from your admin machine:
 
 ```bash
-ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550' < scripts/bootstrap_fixnet_host.sh
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host
+```
+
+This wrapper runs:
+
+1. remote preflight
+2. remote bootstrap
+3. post-bootstrap verification
+
+Manual path, if you want to split the steps yourself:
+
+```bash
+ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550 --fresh-host' < scripts/bootstrap_fixnet_host.sh
 ```
 
 If you want to reuse an existing mnemonic that already lives on the host:
 
 ```bash
-ssh root@<host> 'bash -s -- \
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
-  --identity-file /home/demos/.secrets/demos-mnemonic' < scripts/bootstrap_fixnet_host.sh
+  --reuse-host \
+  --identity-file /home/demos/.secrets/demos-mnemonic
 ```
 
 ## Verification
+
+Post-bootstrap verifier:
+
+```bash
+./scripts/verify_fixnet_host.sh \
+  --url http://<public-ip-or-dns>:53550/info \
+  --ssh-target root@<public-ip-or-dns> \
+  --ssh-identity-file ~/.ssh/<admin-key>
+```
+
+Manual checks:
 
 ```bash
 curl http://<public-ip-or-dns>:53550/info
@@ -52,10 +82,13 @@ After `systemctl restart demos-node.service`, give the node roughly `20-30` seco
 If you want upstream full-profile monitoring with `node-exporter`:
 
 ```bash
-ssh root@<host> 'bash -s -- \
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
   --monitoring-profile full \
-  --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
+  --grafana-admin-password <strong-password>
 ```
 
 For safe access defaults, see [monitoring.md](monitoring.md).

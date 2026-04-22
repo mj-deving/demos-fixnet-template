@@ -33,6 +33,7 @@ so the upstream `docker compose` invocation in `./run` starts the optional `node
 ## Bootstrap options
 
 ```bash
+--fresh-host | --reuse-host
 --monitoring-profile basic|full
 --metrics-port 9090
 --prometheus-port 9091
@@ -47,6 +48,12 @@ The script writes:
 
 - node `.env` with `METRICS_ENABLED=true`
 - `monitoring/.env` with Grafana and Prometheus settings
+
+The recommended wrapper is:
+
+```bash
+./scripts/setup_fixnet_vps.sh
+```
 
 ## Safe access
 

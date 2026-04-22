@@ -17,30 +17,43 @@ Allow inbound:
 ssh root@<host>
 ```
 
-## 3. Run the bootstrap
+## 3. Run the setup wrapper
 
 From your admin machine:
 
 ```bash
-ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550' < scripts/bootstrap_fixnet_host.sh
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host
 ```
 
 If you are restoring an existing mnemonic already present on the host:
 
 ```bash
-ssh root@<host> 'bash -s -- \
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
-  --identity-file /home/demos/.secrets/demos-mnemonic' < scripts/bootstrap_fixnet_host.sh
+  --reuse-host \
+  --identity-file /home/demos/.secrets/demos-mnemonic
 ```
 
-## 4. Verify `/info`
+## 4. If you want the manual path
+
+```bash
+ssh root@<host> 'bash -s -- --public-url http://<public-ip-or-dns>:53550 --fresh-host' < scripts/bootstrap_fixnet_host.sh
+```
+
+## 5. Verify `/info`
 
 ```bash
 curl http://<public-ip-or-dns>:53550/info
 ssh root@<host> 'systemctl status demos-node.service --no-pager'
 ```
 
-## 5. Run a short burn-in
+## 6. Run a short burn-in
 
 ```bash
 ./scripts/monitor_fixnet_burnin.sh \
@@ -51,20 +64,23 @@ ssh root@<host> 'systemctl status demos-node.service --no-pager'
   --interval 30
 ```
 
-## 6. Optional: enable full monitoring
+## 7. Optional: enable full monitoring
 
 If you want host-level metrics too:
 
 ```bash
-ssh root@<host> 'bash -s -- \
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
   --monitoring-profile full \
-  --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
+  --grafana-admin-password <strong-password>
 ```
 
 Use SSH tunneling for Grafana and Prometheus by default instead of opening them publicly.
 
-## 7. Keep one rule in mind
+## 8. Keep one rule in mind
 
 One host, one node, one mnemonic.
 
