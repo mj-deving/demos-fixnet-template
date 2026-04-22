@@ -23,12 +23,14 @@ jobs:
           test -f scripts/setup_fixnet_vps.sh
           test -f scripts/test_host_state_harness.py
           test -f scripts/monitor_fixnet_burnin.sh
+          test -f scripts/restore_archived_install.sh
           test -f examples/.env.example
           test -f examples/demos_peerlist.json.example
           test -f docs/runbooks/vps-bootstrap.md
           test -f docs/runbooks/local-host-bootstrap.md
           test -f docs/runbooks/quickstart-5-minutes.md
           test -f docs/runbooks/monitoring.md
+          test -f docs/runbooks/restore-archived-install.md
           test -f docs/references/mnemonic-handling.md
           test -f docs/references/public-sharing-boundary.md
           test -f examples/monitoring.env.example
@@ -41,6 +43,7 @@ jobs:
           bash -n scripts/verify_fixnet_host.sh
           bash -n scripts/setup_fixnet_vps.sh
           bash -n scripts/monitor_fixnet_burnin.sh
+          bash -n scripts/restore_archived_install.sh
 
       - name: Help smoke test
         run: |
@@ -49,6 +52,7 @@ jobs:
           ./scripts/verify_fixnet_host.sh --help >/dev/null
           ./scripts/setup_fixnet_vps.sh --help >/dev/null
           ./scripts/monitor_fixnet_burnin.sh --help >/dev/null
+          ./scripts/restore_archived_install.sh --help >/dev/null
 
       - name: Host-state harness
         run: |

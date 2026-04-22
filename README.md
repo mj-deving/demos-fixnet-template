@@ -113,6 +113,7 @@ ssh root@<host> 'bash -s -- \
 - [docs/runbooks/local-host-bootstrap.md](docs/runbooks/local-host-bootstrap.md)
 - [docs/runbooks/quickstart-5-minutes.md](docs/runbooks/quickstart-5-minutes.md)
 - [docs/runbooks/monitoring.md](docs/runbooks/monitoring.md)
+- [docs/runbooks/restore-archived-install.md](docs/runbooks/restore-archived-install.md)
 - [docs/references/mnemonic-handling.md](docs/references/mnemonic-handling.md)
 - [docs/references/public-sharing-boundary.md](docs/references/public-sharing-boundary.md)
 - [examples/setup.config.env.example](examples/setup.config.env.example)
@@ -124,6 +125,7 @@ ssh root@<host> 'bash -s -- \
 - use `setup_fixnet_vps.sh` unless you intentionally want manual control
 - `--fresh-host` fails fast on residue, `--reuse-host` intentionally replaces an existing install
 - `--reuse-host` archives replaceable state under `/var/backups/demos-fixnet`
+- use `restore_archived_install.sh` if a reuse-host replacement goes wrong and you need the archived config path back
 - SSH key auth only
 - keep mnemonics outside git
 - allow `20-30` seconds after restart before treating `/info` as unhealthy

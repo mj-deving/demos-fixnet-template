@@ -279,6 +279,19 @@ archive_existing_install() {
 	find "${HOME_DIR}/.secrets" -maxdepth 1 -type f -printf '%f\n' >"${ARCHIVE_DIR}/secrets-file-list.txt" 2>/dev/null || true
 	docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}' >"${ARCHIVE_DIR}/docker-ps.txt" 2>/dev/null || true
 	docker volume ls >"${ARCHIVE_DIR}/docker-volumes.txt" 2>/dev/null || true
+	cat >"${ARCHIVE_DIR}/manifest.json" <<EOF
+{
+  "timestamp": "${ts}",
+  "repo_dir": "${REPO_DIR}",
+  "home_dir": "${HOME_DIR}",
+  "service_name": "demos-node.service",
+  "archive_root": "${ARCHIVE_ROOT}",
+  "branch": "$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)",
+  "service_file_present": $([[ -f /etc/systemd/system/demos-node.service ]] && echo true || echo false),
+  "repo_config_tar_present": $([[ -f "${ARCHIVE_DIR}/repo-config.tar" ]] && echo true || echo false),
+  "repo_status_file_present": $([[ -f "${ARCHIVE_DIR}/repo-status.txt" ]] && echo true || echo false)
+}
+EOF
 }
 
 ensure_base_packages() {

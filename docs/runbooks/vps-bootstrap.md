@@ -74,6 +74,8 @@ If you want a fresh identity generated intentionally:
 
 On `--reuse-host`, bootstrap archives replaceable state under `/var/backups/demos-fixnet` before replacing the old install.
 
+If replacement goes wrong and you need the archived config path back, use [restore-archived-install.md](restore-archived-install.md).
+
 ## Verification
 
 Post-bootstrap verifier:
