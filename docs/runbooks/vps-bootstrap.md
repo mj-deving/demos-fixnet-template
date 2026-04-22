@@ -46,3 +46,16 @@ ssh root@<host> 'systemctl status demos-node.service --no-pager'
 ```
 
 After `systemctl restart demos-node.service`, give the node roughly `20-30` seconds before expecting `/info` to return.
+
+## Full monitoring
+
+If you want upstream full-profile monitoring with `node-exporter`:
+
+```bash
+ssh root@<host> 'bash -s -- \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --monitoring-profile full \
+  --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
+```
+
+For safe access defaults, see [monitoring.md](monitoring.md).

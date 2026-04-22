@@ -51,7 +51,20 @@ ssh root@<host> 'systemctl status demos-node.service --no-pager'
   --interval 30
 ```
 
-## 6. Keep one rule in mind
+## 6. Optional: enable full monitoring
+
+If you want host-level metrics too:
+
+```bash
+ssh root@<host> 'bash -s -- \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --monitoring-profile full \
+  --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
+```
+
+Use SSH tunneling for Grafana and Prometheus by default instead of opening them publicly.
+
+## 7. Keep one rule in mind
 
 One host, one node, one mnemonic.
 

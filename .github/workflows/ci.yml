@@ -23,8 +23,10 @@ jobs:
           test -f docs/runbooks/vps-bootstrap.md
           test -f docs/runbooks/local-host-bootstrap.md
           test -f docs/runbooks/quickstart-5-minutes.md
+          test -f docs/runbooks/monitoring.md
           test -f docs/references/mnemonic-handling.md
           test -f docs/references/public-sharing-boundary.md
+          test -f examples/monitoring.env.example
 
       - name: Bash syntax check
         run: |

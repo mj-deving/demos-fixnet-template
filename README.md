@@ -6,6 +6,7 @@ This repo is intentionally small. It does not contain any tenant inventory, prov
 
 - a host bootstrap script
 - a short burn-in monitor
+- upstream-aligned monitoring support with optional full profile
 - generalized runbooks for VPS and local-host usage
 - safe examples for `.env` and `demos_peerlist.json`
 
@@ -59,6 +60,15 @@ ssh root@<host> 'bash -s -- \
   --identity-file /home/demos/.secrets/demos-mnemonic' < scripts/bootstrap_fixnet_host.sh
 ```
 
+If you want the upstream full monitoring profile with `node-exporter`:
+
+```bash
+ssh root@<host> 'bash -s -- \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --monitoring-profile full \
+  --grafana-admin-password <strong-password>' < scripts/bootstrap_fixnet_host.sh
+```
+
 ### Short burn-in
 
 ```bash
@@ -73,6 +83,7 @@ ssh root@<host> 'bash -s -- \
 - [docs/runbooks/vps-bootstrap.md](docs/runbooks/vps-bootstrap.md)
 - [docs/runbooks/local-host-bootstrap.md](docs/runbooks/local-host-bootstrap.md)
 - [docs/runbooks/quickstart-5-minutes.md](docs/runbooks/quickstart-5-minutes.md)
+- [docs/runbooks/monitoring.md](docs/runbooks/monitoring.md)
 - [docs/references/mnemonic-handling.md](docs/references/mnemonic-handling.md)
 - [docs/references/public-sharing-boundary.md](docs/references/public-sharing-boundary.md)
 

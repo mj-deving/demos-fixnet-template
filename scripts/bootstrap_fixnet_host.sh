@@ -8,6 +8,14 @@ UPSTREAM_REPO="https://github.com/kynesyslabs/node.git"
 PUBLIC_URL=""
 IDENTITY_FILE=""
 DISABLE_MONITORING=false
+MONITORING_PROFILE="basic"
+METRICS_PORT="9090"
+PROMETHEUS_PORT="9091"
+GRAFANA_PORT="3000"
+NODE_EXPORTER_PORT="9100"
+GRAFANA_ADMIN_USER="admin"
+GRAFANA_ADMIN_PASSWORD="demos"
+GRAFANA_ROOT_URL="http://localhost:3000"
 ANCHOR_PUBKEY="0x680464e81ff8a088611d91eb97c40326dc3d8981bd29cf2721b47daa60f56274"
 ANCHOR_URL="http://node3.demos.sh:60001"
 
@@ -26,6 +34,14 @@ Optional:
   --branch stabilisation
   --upstream-repo https://github.com/kynesyslabs/node.git
   --identity-file /home/demos/.secrets/demos-mnemonic
+  --monitoring-profile basic|full
+  --metrics-port 9090
+  --prometheus-port 9091
+  --grafana-port 3000
+  --node-exporter-port 9100
+  --grafana-admin-user admin
+  --grafana-admin-password demos
+  --grafana-root-url http://localhost:3000
   --anchor-pubkey 0x...
   --anchor-url http://node3.demos.sh:60001
   --disable-monitoring
@@ -65,6 +81,38 @@ while [[ $# -gt 0 ]]; do
 		IDENTITY_FILE="${2:-}"
 		shift 2
 		;;
+	--monitoring-profile)
+		MONITORING_PROFILE="${2:-}"
+		shift 2
+		;;
+	--metrics-port)
+		METRICS_PORT="${2:-}"
+		shift 2
+		;;
+	--prometheus-port)
+		PROMETHEUS_PORT="${2:-}"
+		shift 2
+		;;
+	--grafana-port)
+		GRAFANA_PORT="${2:-}"
+		shift 2
+		;;
+	--node-exporter-port)
+		NODE_EXPORTER_PORT="${2:-}"
+		shift 2
+		;;
+	--grafana-admin-user)
+		GRAFANA_ADMIN_USER="${2:-}"
+		shift 2
+		;;
+	--grafana-admin-password)
+		GRAFANA_ADMIN_PASSWORD="${2:-}"
+		shift 2
+		;;
+	--grafana-root-url)
+		GRAFANA_ROOT_URL="${2:-}"
+		shift 2
+		;;
 	--anchor-pubkey)
 		ANCHOR_PUBKEY="${2:-}"
 		shift 2
@@ -91,6 +139,11 @@ done
 
 if [[ -z "${PUBLIC_URL}" ]]; then
 	echo "--public-url is required" >&2
+	exit 1
+fi
+
+if [[ "${MONITORING_PROFILE}" != "basic" && "${MONITORING_PROFILE}" != "full" ]]; then
+	echo "--monitoring-profile must be 'basic' or 'full'" >&2
 	exit 1
 fi
 
@@ -179,7 +232,7 @@ install_deps() {
 cleanup_runtime_artifacts() {
 	pkill -KILL -f "${REPO_DIR}/scripts/run" || true
 	pkill -KILL -f "src/index.ts --no-tui" || true
-	docker rm -f postgres_5332 neo4j-cgc tlsn-notary-7047 demos-prometheus demos-grafana >/dev/null 2>&1 || true
+	docker rm -f postgres_5332 neo4j-cgc tlsn-notary-7047 demos-prometheus demos-grafana demos-node-exporter >/dev/null 2>&1 || true
 	rm -rf "${REPO_DIR}/postgres_5332" "${REPO_DIR}/logs" >/dev/null 2>&1 || true
 }
 
@@ -224,26 +277,42 @@ write_fixnet_config() {
 		run_flags="${run_flags} -m"
 	fi
 
-	user_shell "cd ${REPO_DIR} && cat > .env <<ENV
+	cat > "${REPO_DIR}/.env" <<ENV
 PROD=true
 EXPOSED_URL=${PUBLIC_URL}
-ENV"
+METRICS_ENABLED=true
+METRICS_PORT=${METRICS_PORT}
+ENV
 
-	user_shell "cd ${REPO_DIR} && cat > demos_peerlist.json <<JSON
+	cat > "${REPO_DIR}/monitoring/.env" <<ENV
+PROMETHEUS_PORT=${PROMETHEUS_PORT}
+PROMETHEUS_RETENTION=15d
+GRAFANA_PORT=${GRAFANA_PORT}
+GRAFANA_ADMIN_USER=${GRAFANA_ADMIN_USER}
+GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+GRAFANA_ROOT_URL=${GRAFANA_ROOT_URL}
+NODE_EXPORTER_PORT=${NODE_EXPORTER_PORT}
+ENV
+
+	cat > "${REPO_DIR}/demos_peerlist.json" <<JSON
 {
   \"${ANCHOR_PUBKEY}\": \"${ANCHOR_URL}\"
 }
-JSON"
+JSON
 
 	rm -rf "${REPO_DIR}/postgres_5332"
 
-	user_shell "cd ${REPO_DIR} && cat > fnode.sh <<SH
+	cat > "${REPO_DIR}/fnode.sh" <<SH
 #!/usr/bin/env bash
 export PATH=\"${HOME_DIR}/.bun/bin:${HOME_DIR}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:\$PATH\"
+if [[ \"${MONITORING_PROFILE}\" == \"full\" ]]; then
+export COMPOSE_PROFILES=full
+fi
 cd ${REPO_DIR}
 exec ./run ${run_flags}
 SH
-chmod +x fnode.sh"
+	chown "${USER_NAME}:${USER_NAME}" "${REPO_DIR}/.env" "${REPO_DIR}/monitoring/.env" "${REPO_DIR}/demos_peerlist.json" "${REPO_DIR}/fnode.sh"
+	chmod +x "${REPO_DIR}/fnode.sh"
 }
 
 install_service() {
