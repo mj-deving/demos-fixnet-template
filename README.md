@@ -66,6 +66,12 @@ Same flow from a reusable config file:
 ./scripts/setup_fixnet_vps.sh --config examples/setup.config.env.example
 ```
 
+Identity modes:
+
+- `auto`: reuse `--identity-file` if it exists, otherwise generate
+- `existing`: require an existing identity file
+- `generate`: force a new identity and refuse to overwrite an existing file
+
 Direct bootstrap is still available if you want to run the steps manually:
 
 ```bash
@@ -78,6 +84,7 @@ If you already have a mnemonic on the host:
 ssh root@<host> 'bash -s -- \
   --public-url http://<public-ip-or-dns>:53550 \
   --reuse-host \
+  --identity-mode existing \
   --identity-file /home/demos/.secrets/demos-mnemonic' < scripts/bootstrap_fixnet_host.sh
 ```
 
@@ -116,6 +123,7 @@ ssh root@<host> 'bash -s -- \
 - one mnemonic per node
 - use `setup_fixnet_vps.sh` unless you intentionally want manual control
 - `--fresh-host` fails fast on residue, `--reuse-host` intentionally replaces an existing install
+- `--reuse-host` archives replaceable state under `/var/backups/demos-fixnet`
 - SSH key auth only
 - keep mnemonics outside git
 - allow `20-30` seconds after restart before treating `/info` as unhealthy

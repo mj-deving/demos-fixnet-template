@@ -45,6 +45,7 @@ If you are restoring an existing mnemonic already present on the host:
   --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
   --reuse-host \
+  --identity-mode existing \
   --identity-file /home/demos/.secrets/demos-mnemonic
 ```
 

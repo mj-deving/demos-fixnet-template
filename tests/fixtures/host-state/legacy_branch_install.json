@@ -1,0 +1,24 @@
+{
+  "inputs": {
+    "host_mode": "reuse",
+    "desired_branch": "stabilisation"
+  },
+  "state": {
+    "apt_healthy": true,
+    "service_exists": true,
+    "repo_exists": true,
+    "containers_exist": true,
+    "existing_branch": "testnet",
+    "docker_installed": true,
+    "docker_version_ok": true,
+    "docker_compose_ok": true,
+    "bun_installed": true,
+    "bun_version_ok": true,
+    "rust_installed": true,
+    "rust_version_ok": true
+  },
+  "expected": {
+    "classification": "legacy_demos_install",
+    "recommended_strategy": "archive_and_replace_install"
+  }
+}

@@ -13,6 +13,10 @@ GRAFANA_PORT="3000"
 NODE_EXPORTER_PORT="9100"
 OUTPUT_JSON=false
 EVENTS_FILE=""
+MIN_DOCKER_VERSION="24.0.0"
+MIN_BUN_VERSION="1.0.0"
+MIN_RUST_VERSION="1.75.0"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
 	cat <<'EOF'
@@ -115,6 +119,15 @@ rust_installed=false
 apt_healthy=false
 reboot_required=false
 identity_present=false
+docker_version_value=""
+bun_version_value=""
+rust_version_value=""
+docker_version_ok=false
+bun_version_ok=false
+rust_version_ok=false
+docker_compose_ok=false
+existing_branch=""
+existing_service_active=false
 classification="unknown"
 recommended_strategy="unknown"
 host_summary=""
@@ -162,6 +175,28 @@ check_https() {
 	curl -fsSIL --max-time 10 "$url" >/dev/null 2>&1
 }
 
+version_ge() {
+	local current="$1"
+	local minimum="$2"
+	[[ -n "${current}" && "$(printf '%s\n%s\n' "${minimum}" "${current}" | sort -V | head -n1)" == "${minimum}" ]]
+}
+
+detect_bun_version() {
+	if command -v bun >/dev/null 2>&1; then
+		bun --version 2>/dev/null | head -n1
+	elif [[ -x "/home/${USER_NAME}/.bun/bin/bun" ]]; then
+		"/home/${USER_NAME}/.bun/bin/bun" --version 2>/dev/null | head -n1
+	fi
+}
+
+detect_rust_version() {
+	if command -v cargo >/dev/null 2>&1; then
+		cargo --version 2>/dev/null | awk '{print $2}' | head -n1
+	elif [[ -x "/home/${USER_NAME}/.cargo/bin/cargo" ]]; then
+		"/home/${USER_NAME}/.cargo/bin/cargo" --version 2>/dev/null | awk '{print $2}' | head -n1
+	fi
+}
+
 if dpkg --audit >/dev/null 2>&1 && apt-get -qq update >/dev/null 2>&1; then
 	apt_healthy=true
 	pass "package manager health is acceptable"
@@ -171,6 +206,13 @@ fi
 
 if command -v docker >/dev/null 2>&1; then
 	docker_installed=true
+	docker_version_value="$(docker version --format '{{.Server.Version}}' 2>/dev/null | head -n1)"
+	if version_ge "${docker_version_value}" "${MIN_DOCKER_VERSION}"; then
+		docker_version_ok=true
+	fi
+	if docker compose version >/dev/null 2>&1; then
+		docker_compose_ok=true
+	fi
 	pass "docker is installed"
 else
 	warn "docker is not installed"
@@ -178,6 +220,10 @@ fi
 
 if command -v bun >/dev/null 2>&1 || [[ -x "/home/${USER_NAME}/.bun/bin/bun" ]]; then
 	bun_installed=true
+	bun_version_value="$(detect_bun_version)"
+	if version_ge "${bun_version_value}" "${MIN_BUN_VERSION}"; then
+		bun_version_ok=true
+	fi
 	pass "bun is installed or already present for the service user"
 else
 	warn "bun is not installed"
@@ -185,6 +231,10 @@ fi
 
 if command -v cargo >/dev/null 2>&1 || [[ -x "/home/${USER_NAME}/.cargo/bin/cargo" ]]; then
 	rust_installed=true
+	rust_version_value="$(detect_rust_version)"
+	if version_ge "${rust_version_value}" "${MIN_RUST_VERSION}"; then
+		rust_version_ok=true
+	fi
 	pass "rust/cargo is installed or already present for the service user"
 else
 	warn "rust/cargo is not installed"
@@ -308,6 +358,9 @@ if [[ "${HOST_MODE}" == "fresh" ]]; then
 else
 	if systemctl list-unit-files demos-node.service --no-legend 2>/dev/null | grep -q '^demos-node\.service'; then
 		service_exists=true
+		if [[ "$(systemctl is-active demos-node.service 2>/dev/null || true)" == "active" ]]; then
+			existing_service_active=true
+		fi
 		warn "existing demos-node.service detected and will be replaced"
 	else
 		pass "no existing demos-node.service"
@@ -315,6 +368,9 @@ else
 
 	if [[ -e "${REPO_DIR}" ]]; then
 		repo_exists=true
+		if git -C "${REPO_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+			existing_branch="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+		fi
 		warn "repo path already exists and will be replaced"
 	else
 		pass "repo path is absent"
@@ -328,33 +384,59 @@ else
 	fi
 fi
 
-if [[ "${apt_healthy}" != "true" ]]; then
-	classification="broken_package_manager"
-	recommended_strategy="abort_requires_human"
-	host_summary="package manager is unhealthy"
-elif [[ "${HOST_MODE}" == "fresh" && ( "${service_exists}" == "true" || "${repo_exists}" == "true" || "${containers_exist}" == "true" ) ]]; then
-	classification="residue_present"
-	recommended_strategy="abort_and_require_reuse_mode"
-	host_summary="fresh-host path found existing DEMOS residue"
-elif [[ "${service_exists}" == "true" || "${repo_exists}" == "true" || "${containers_exist}" == "true" ]]; then
-	classification="existing_demos_install"
-	recommended_strategy="replace_existing_install"
-	host_summary="existing DEMOS footprint detected"
-elif [[ "${docker_installed}" != "true" || "${bun_installed}" != "true" || "${rust_installed}" != "true" ]]; then
-	classification="stale_or_partial_host"
-	recommended_strategy="repair_runtime_then_install"
-	host_summary="runtime components are missing or partial"
-else
-	classification="fresh_candidate"
-	recommended_strategy="fresh_install"
-	host_summary="host looks ready for a clean install"
-fi
+eval_payload="$(python3 - "${PUBLIC_URL}" "${HOST_MODE}" "${MONITORING_PROFILE}" "${REPO_DIR}" "${IDENTITY_FILE}" "${existing_branch}" \
+	"${service_exists}" "${repo_exists}" "${containers_exist}" "${docker_installed}" "${docker_version_value}" "${docker_version_ok}" \
+	"${docker_compose_ok}" "${bun_installed}" "${bun_version_value}" "${bun_version_ok}" "${rust_installed}" "${rust_version_value}" \
+	"${rust_version_ok}" "${apt_healthy}" "${reboot_required}" "${identity_present}" "${existing_service_active}" <<'PY'
+import json
+import sys
+
+payload = {
+    "inputs": {
+        "public_url": sys.argv[1],
+        "host_mode": sys.argv[2],
+        "monitoring_profile": sys.argv[3],
+        "repo_dir": sys.argv[4],
+        "identity_file": sys.argv[5],
+        "desired_branch": "stabilisation",
+    },
+    "state": {
+        "existing_branch": sys.argv[6],
+        "service_exists": sys.argv[7] == "true",
+        "repo_exists": sys.argv[8] == "true",
+        "containers_exist": sys.argv[9] == "true",
+        "docker_installed": sys.argv[10] == "true",
+        "docker_version": sys.argv[11],
+        "docker_version_ok": sys.argv[12] == "true",
+        "docker_compose_ok": sys.argv[13] == "true",
+        "bun_installed": sys.argv[14] == "true",
+        "bun_version": sys.argv[15],
+        "bun_version_ok": sys.argv[16] == "true",
+        "rust_installed": sys.argv[17] == "true",
+        "rust_version": sys.argv[18],
+        "rust_version_ok": sys.argv[19] == "true",
+        "apt_healthy": sys.argv[20] == "true",
+        "reboot_required": sys.argv[21] == "true",
+        "identity_present": sys.argv[22] == "true",
+        "existing_service_active": sys.argv[23] == "true",
+    },
+}
+print(json.dumps(payload))
+PY
+)"
+
+eval_result="$(printf '%s' "${eval_payload}" | "${SCRIPT_DIR}/evaluate_host_state.py")"
+classification="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["classification"])' <<<"${eval_result}")"
+recommended_strategy="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["recommended_strategy"])' <<<"${eval_result}")"
+host_summary="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["host_summary"])' <<<"${eval_result}")"
 
 if [[ "${OUTPUT_JSON}" == "true" ]]; then
 	python3 - "${EVENTS_FILE}" "${failures}" "${warnings}" "${PUBLIC_URL}" "${HOST_MODE}" "${MONITORING_PROFILE}" \
 		"${classification}" "${recommended_strategy}" "${host_summary}" "${service_exists}" "${repo_exists}" \
-		"${containers_exist}" "${docker_installed}" "${bun_installed}" "${rust_installed}" "${apt_healthy}" \
-		"${reboot_required}" "${identity_present}" "${REPO_DIR}" "${IDENTITY_FILE}" <<'PY'
+		"${containers_exist}" "${docker_installed}" "${docker_version_value}" "${docker_version_ok}" "${docker_compose_ok}" \
+		"${bun_installed}" "${bun_version_value}" "${bun_version_ok}" "${rust_installed}" "${rust_version_value}" \
+		"${rust_version_ok}" "${apt_healthy}" "${reboot_required}" "${identity_present}" "${existing_branch}" \
+		"${existing_service_active}" "${REPO_DIR}" "${IDENTITY_FILE}" <<'PY'
 import json
 import sys
 
@@ -379,11 +461,20 @@ data = {
         "repo_exists": sys.argv[11] == "true",
         "containers_exist": sys.argv[12] == "true",
         "docker_installed": sys.argv[13] == "true",
-        "bun_installed": sys.argv[14] == "true",
-        "rust_installed": sys.argv[15] == "true",
-        "apt_healthy": sys.argv[16] == "true",
-        "reboot_required": sys.argv[17] == "true",
-        "identity_present": sys.argv[18] == "true",
+        "docker_version": sys.argv[14],
+        "docker_version_ok": sys.argv[15] == "true",
+        "docker_compose_ok": sys.argv[16] == "true",
+        "bun_installed": sys.argv[17] == "true",
+        "bun_version": sys.argv[18],
+        "bun_version_ok": sys.argv[19] == "true",
+        "rust_installed": sys.argv[20] == "true",
+        "rust_version": sys.argv[21],
+        "rust_version_ok": sys.argv[22] == "true",
+        "apt_healthy": sys.argv[23] == "true",
+        "reboot_required": sys.argv[24] == "true",
+        "identity_present": sys.argv[25] == "true",
+        "existing_branch": sys.argv[26],
+        "existing_service_active": sys.argv[27] == "true",
     },
     "events": [],
 }

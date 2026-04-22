@@ -1,0 +1,23 @@
+{
+  "inputs": {
+    "host_mode": "fresh",
+    "desired_branch": "stabilisation"
+  },
+  "state": {
+    "apt_healthy": true,
+    "service_exists": false,
+    "repo_exists": false,
+    "containers_exist": false,
+    "docker_installed": true,
+    "docker_version_ok": false,
+    "docker_compose_ok": false,
+    "bun_installed": false,
+    "bun_version_ok": false,
+    "rust_installed": true,
+    "rust_version_ok": false
+  },
+  "expected": {
+    "classification": "stale_or_partial_host",
+    "recommended_strategy": "repair_runtime_then_install"
+  }
+}

@@ -17,9 +17,11 @@ jobs:
         run: |
           test -f README.md
           test -f scripts/bootstrap_fixnet_host.sh
+          test -f scripts/evaluate_host_state.py
           test -f scripts/preflight_fixnet_host.sh
           test -f scripts/verify_fixnet_host.sh
           test -f scripts/setup_fixnet_vps.sh
+          test -f scripts/test_host_state_harness.py
           test -f scripts/monitor_fixnet_burnin.sh
           test -f examples/.env.example
           test -f examples/demos_peerlist.json.example
@@ -47,3 +49,7 @@ jobs:
           ./scripts/verify_fixnet_host.sh --help >/dev/null
           ./scripts/setup_fixnet_vps.sh --help >/dev/null
           ./scripts/monitor_fixnet_burnin.sh --help >/dev/null
+
+      - name: Host-state harness
+        run: |
+          python3 scripts/test_host_state_harness.py

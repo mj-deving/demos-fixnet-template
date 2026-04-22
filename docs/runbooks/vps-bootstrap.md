@@ -57,8 +57,22 @@ If you want to reuse an existing mnemonic that already lives on the host:
   --ssh-identity-file ~/.ssh/<admin-key> \
   --public-url http://<public-ip-or-dns>:53550 \
   --reuse-host \
+  --identity-mode existing \
   --identity-file /home/demos/.secrets/demos-mnemonic
 ```
+
+If you want a fresh identity generated intentionally:
+
+```bash
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
+  --identity-mode generate
+```
+
+On `--reuse-host`, bootstrap archives replaceable state under `/var/backups/demos-fixnet` before replacing the old install.
 
 ## Verification
 

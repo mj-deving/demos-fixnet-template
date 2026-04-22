@@ -9,6 +9,7 @@ SSH_IDENTITY_FILE=""
 PUBLIC_URL=""
 HOST_MODE=""
 IDENTITY_FILE=""
+IDENTITY_MODE=""
 MONITORING_PROFILE="basic"
 UPSTREAM_REPO=""
 BRANCH=""
@@ -44,6 +45,7 @@ Optional:
   --config ./my-host.env
   --ssh-identity-file ~/.ssh/<admin-key>
   --identity-file /home/demos/.secrets/demos-mnemonic
+  --identity-mode auto|existing|generate
   --monitoring-profile basic|full
   --upstream-repo https://github.com/kynesyslabs/node.git
   --branch stabilisation
@@ -97,6 +99,7 @@ SSH_IDENTITY_FILE="${SSH_IDENTITY_FILE:-}"
 PUBLIC_URL="${PUBLIC_URL:-}"
 HOST_MODE="${HOST_MODE:-}"
 IDENTITY_FILE="${IDENTITY_FILE:-}"
+IDENTITY_MODE="${IDENTITY_MODE:-}"
 MONITORING_PROFILE="${MONITORING_PROFILE:-basic}"
 UPSTREAM_REPO="${UPSTREAM_REPO:-}"
 BRANCH="${BRANCH:-}"
@@ -138,6 +141,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--identity-file)
 		IDENTITY_FILE="${2:-}"
+		shift 2
+		;;
+	--identity-mode)
+		IDENTITY_MODE="${2:-}"
 		shift 2
 		;;
 	--monitoring-profile)
@@ -279,6 +286,9 @@ fi
 
 if [[ -n "${IDENTITY_FILE}" ]]; then
 	shared_args+=(--identity-file "${IDENTITY_FILE}")
+fi
+if [[ -n "${IDENTITY_MODE}" ]]; then
+	shared_args+=(--identity-mode "${IDENTITY_MODE}")
 fi
 if [[ -n "${UPSTREAM_REPO}" ]]; then
 	shared_args+=(--upstream-repo "${UPSTREAM_REPO}")

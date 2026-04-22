@@ -1,0 +1,23 @@
+{
+  "inputs": {
+    "host_mode": "fresh",
+    "desired_branch": "stabilisation"
+  },
+  "state": {
+    "apt_healthy": true,
+    "service_exists": false,
+    "repo_exists": false,
+    "containers_exist": false,
+    "docker_installed": true,
+    "docker_version_ok": true,
+    "docker_compose_ok": true,
+    "bun_installed": true,
+    "bun_version_ok": true,
+    "rust_installed": true,
+    "rust_version_ok": true
+  },
+  "expected": {
+    "classification": "fresh_candidate",
+    "recommended_strategy": "fresh_install"
+  }
+}

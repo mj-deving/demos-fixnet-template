@@ -7,6 +7,7 @@ BRANCH="stabilisation"
 UPSTREAM_REPO="https://github.com/kynesyslabs/node.git"
 PUBLIC_URL=""
 IDENTITY_FILE=""
+IDENTITY_MODE="auto"
 DISABLE_MONITORING=false
 HOST_MODE=""
 MONITORING_PROFILE="basic"
@@ -17,6 +18,10 @@ NODE_EXPORTER_PORT="9100"
 GRAFANA_ADMIN_USER="admin"
 GRAFANA_ADMIN_PASSWORD="demos"
 GRAFANA_ROOT_URL="http://localhost:3000"
+MIN_DOCKER_VERSION="24.0.0"
+MIN_BUN_VERSION="1.0.0"
+MIN_RUST_VERSION="1.75.0"
+ARCHIVE_ROOT="/var/backups/demos-fixnet"
 ANCHOR_PUBKEY="0x680464e81ff8a088611d91eb97c40326dc3d8981bd29cf2721b47daa60f56274"
 ANCHOR_URL="http://node3.demos.sh:60001"
 
@@ -36,6 +41,7 @@ Optional:
   --branch stabilisation
   --upstream-repo https://github.com/kynesyslabs/node.git
   --identity-file /home/demos/.secrets/demos-mnemonic
+  --identity-mode auto|existing|generate
   --monitoring-profile basic|full
   --metrics-port 9090
   --prometheus-port 9091
@@ -51,9 +57,8 @@ Optional:
 Notes:
   - This script assumes one DEMOS node per host.
   - You must choose either --fresh-host or --reuse-host.
-  - It installs Bun and Rust/Cargo for the service user if needed.
-  - If no identity file is supplied, it performs a first boot to generate one,
-    backs it up under ~/.secrets, then switches into fixnet mode.
+  - It repairs or installs Docker, Bun, and Rust/Cargo if they are absent or below policy.
+  - In reuse-host mode it archives replaceable state under /var/backups/demos-fixnet.
 EOF
 }
 
@@ -82,6 +87,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--identity-file)
 		IDENTITY_FILE="${2:-}"
+		shift 2
+		;;
+	--identity-mode)
+		IDENTITY_MODE="${2:-}"
 		shift 2
 		;;
 	--fresh-host)
@@ -163,6 +172,11 @@ if [[ "${MONITORING_PROFILE}" != "basic" && "${MONITORING_PROFILE}" != "full" ]]
 	exit 1
 fi
 
+if [[ "${IDENTITY_MODE}" != "auto" && "${IDENTITY_MODE}" != "existing" && "${IDENTITY_MODE}" != "generate" ]]; then
+	echo "--identity-mode must be 'auto', 'existing', or 'generate'" >&2
+	exit 1
+fi
+
 if [[ "$(id -u)" -ne 0 ]]; then
 	echo "Run this script as root" >&2
 	exit 1
@@ -172,9 +186,33 @@ HOME_DIR="/home/${USER_NAME}"
 SECRETS_DIR="${HOME_DIR}/.secrets"
 FIRST_RUN_LOG="${HOME_DIR}/first-run.log"
 FIRST_RUN_PID="${HOME_DIR}/first-run.pid"
+ARCHIVE_DIR=""
 
 user_shell() {
 	sudo -u "${USER_NAME}" -H bash -lc "$*"
+}
+
+version_ge() {
+	local current="$1"
+	local minimum="$2"
+	[[ "$(printf '%s\n%s\n' "${minimum}" "${current}" | sort -V | head -n1)" == "${minimum}" ]]
+}
+
+docker_version() {
+	docker version --format '{{.Server.Version}}' 2>/dev/null | head -n1
+}
+
+user_bun_version() {
+	user_shell 'if [[ -x "$HOME/.bun/bin/bun" ]]; then "$HOME/.bun/bin/bun" --version; elif command -v bun >/dev/null 2>&1; then bun --version; fi' 2>/dev/null | head -n1
+}
+
+user_rust_version() {
+	user_shell 'if [[ -x "$HOME/.cargo/bin/cargo" ]]; then "$HOME/.cargo/bin/cargo" --version | awk "{print \$2}"; elif command -v cargo >/dev/null 2>&1; then cargo --version | awk "{print \$2}"; fi' 2>/dev/null | head -n1
+}
+
+repair_apt_state() {
+	dpkg --configure -a >/dev/null 2>&1 || true
+	apt-get -f install -y >/dev/null 2>&1 || true
 }
 
 service_exists() {
@@ -206,6 +244,7 @@ assert_fresh_host() {
 }
 
 cleanup_existing_install() {
+	archive_existing_install
 	if service_exists; then
 		systemctl stop demos-node.service >/dev/null 2>&1 || true
 		systemctl disable demos-node.service >/dev/null 2>&1 || true
@@ -217,7 +256,33 @@ cleanup_existing_install() {
 	rm -rf "${REPO_DIR}"
 }
 
+archive_existing_install() {
+	local ts
+	ts="$(date -u +%Y%m%dT%H%M%SZ)"
+	ARCHIVE_DIR="${ARCHIVE_ROOT}/${ts}"
+
+	install -d -m 700 "${ARCHIVE_DIR}"
+
+	if service_exists; then
+		cp /etc/systemd/system/demos-node.service "${ARCHIVE_DIR}/demos-node.service.bak" 2>/dev/null || true
+		systemctl cat demos-node.service >"${ARCHIVE_DIR}/demos-node.service.cat" 2>/dev/null || true
+		systemctl status demos-node.service --no-pager >"${ARCHIVE_DIR}/demos-node.service.status.txt" 2>/dev/null || true
+	fi
+
+	if [[ -d "${REPO_DIR}" ]]; then
+		tar -C "${REPO_DIR}" -cf "${ARCHIVE_DIR}/repo-config.tar" \
+			.env monitoring/.env demos_peerlist.json fnode.sh .demos_identity 2>/dev/null || true
+		git -C "${REPO_DIR}" status --short >"${ARCHIVE_DIR}/repo-status.txt" 2>/dev/null || true
+		git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD >"${ARCHIVE_DIR}/repo-branch.txt" 2>/dev/null || true
+	fi
+
+	find "${HOME_DIR}/.secrets" -maxdepth 1 -type f -printf '%f\n' >"${ARCHIVE_DIR}/secrets-file-list.txt" 2>/dev/null || true
+	docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}' >"${ARCHIVE_DIR}/docker-ps.txt" 2>/dev/null || true
+	docker volume ls >"${ARCHIVE_DIR}/docker-volumes.txt" 2>/dev/null || true
+}
+
 ensure_base_packages() {
+	repair_apt_state
 	local waited=0
 	while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
 		fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
@@ -237,7 +302,17 @@ ensure_base_packages() {
 }
 
 ensure_docker() {
+	local current=""
+	local compose_ok=false
+
 	if command -v docker >/dev/null 2>&1; then
+		current="$(docker_version)"
+		if docker compose version >/dev/null 2>&1; then
+			compose_ok=true
+		fi
+	fi
+
+	if [[ -n "${current}" ]] && version_ge "${current}" "${MIN_DOCKER_VERSION}" && [[ "${compose_ok}" == "true" ]]; then
 		systemctl enable --now docker
 		return
 	fi
@@ -261,14 +336,18 @@ ensure_user() {
 }
 
 ensure_bun() {
-	if user_shell 'test -x "$HOME/.bun/bin/bun"'; then
+	local current=""
+	current="$(user_bun_version)"
+	if [[ -n "${current}" ]] && version_ge "${current}" "${MIN_BUN_VERSION}"; then
 		return
 	fi
 	user_shell 'curl -fsSL https://bun.sh/install | bash'
 }
 
 ensure_rust() {
-	if user_shell 'command -v cargo >/dev/null 2>&1'; then
+	local current=""
+	current="$(user_rust_version)"
+	if [[ -n "${current}" ]] && version_ge "${current}" "${MIN_RUST_VERSION}"; then
 		return
 	fi
 	user_shell 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
@@ -292,8 +371,21 @@ cleanup_runtime_artifacts() {
 }
 
 generate_identity_if_needed() {
-	if [[ -n "${IDENTITY_FILE}" ]] && [[ -f "${IDENTITY_FILE}" ]]; then
+	if [[ "${IDENTITY_MODE}" == "existing" ]]; then
+		if [[ -z "${IDENTITY_FILE}" || ! -f "${IDENTITY_FILE}" ]]; then
+			echo "identity-mode existing requires a valid --identity-file" >&2
+			exit 1
+		fi
 		return
+	fi
+
+	if [[ "${IDENTITY_MODE}" == "auto" && -n "${IDENTITY_FILE}" && -f "${IDENTITY_FILE}" ]]; then
+		return
+	fi
+
+	if [[ "${IDENTITY_MODE}" == "generate" && -n "${IDENTITY_FILE}" && -f "${IDENTITY_FILE}" ]]; then
+		echo "identity-mode generate refuses to overwrite an existing identity file at ${IDENTITY_FILE}" >&2
+		exit 1
 	fi
 
 	user_shell "export PATH=\"\$HOME/.bun/bin:\$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:\$PATH\" && cd ${REPO_DIR} && rm -f ${FIRST_RUN_LOG} ${FIRST_RUN_PID} && nohup ./run -t >${FIRST_RUN_LOG} 2>&1 & echo \$! >${FIRST_RUN_PID}"
@@ -310,7 +402,9 @@ generate_identity_if_needed() {
 		exit 1
 	fi
 
-	IDENTITY_FILE="${SECRETS_DIR}/$(hostname)-mnemonic"
+	if [[ -z "${IDENTITY_FILE}" ]]; then
+		IDENTITY_FILE="${SECRETS_DIR}/$(hostname)-mnemonic"
+	fi
 	user_shell "install -m 600 ${REPO_DIR}/.demos_identity ${IDENTITY_FILE}"
 
 	if user_shell "test -f ${FIRST_RUN_PID}" >/dev/null 2>&1; then
@@ -419,3 +513,6 @@ install_service
 
 echo "Bootstrap complete for ${PUBLIC_URL}"
 echo "Identity file: ${IDENTITY_FILE}"
+if [[ -n "${ARCHIVE_DIR}" ]]; then
+	echo "Archived prior install state to: ${ARCHIVE_DIR}"
+fi
