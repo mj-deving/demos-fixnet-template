@@ -1,8 +1,8 @@
-# DEMOS Fixnet Template
+# DEMOS Fixnet Operator Kit
 
-Public, provider-neutral companion repo for bringing a fresh Linux host onto the DEMOS fixnet using the upstream [`kynesyslabs/node`](https://github.com/kynesyslabs/node) repository.
+Public, provider-neutral operator kit for bringing Linux hosts onto the DEMOS fixnet and keeping them healthy over time with setup, verification, recovery, and dirty-host regression tooling.
 
-This repo is intentionally small. It does not contain any tenant inventory, provider API automation, live IP addresses, or mnemonic material. It only contains the reusable operator layer:
+This repo does not contain tenant inventory, provider account automation, live fleet data, or mnemonic material. It contains the reusable operator layer around the upstream [`kynesyslabs/node`](https://github.com/kynesyslabs/node) repository:
 
 - a one-command VPS setup wrapper
 - a remote preflight checker
@@ -10,8 +10,25 @@ This repo is intentionally small. It does not contain any tenant inventory, prov
 - a post-bootstrap verifier
 - a short burn-in monitor
 - upstream-aligned monitoring support with optional full profile
+- archive restore tooling for reuse-host recovery
+- dirty-host regression harnesses for state detection
 - generalized runbooks for VPS and local-host usage
 - safe examples for `.env` and `demos_peerlist.json`
+
+## Scope
+
+This repo is no longer just a starter template.
+
+It is the provider-neutral operator toolkit for:
+
+- host setup
+- health verification
+- short burn-in observation
+- monitoring enablement
+- reuse-host archive and restore
+- regression testing for dirty-host classification behavior
+
+The actual node code still lives upstream. Provider-specific fleet control should live in a separate private layer on top of this repo.
 
 ## What This Repo Does
 
@@ -25,6 +42,8 @@ It helps you:
 6. install a systemd service
 7. verify `/info`
 8. run a short burn-in check
+9. restore archived config from a failed reuse-host replacement
+10. regression-test host-state detection logic
 
 ## What This Repo Does Not Do
 
