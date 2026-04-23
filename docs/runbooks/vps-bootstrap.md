@@ -36,6 +36,7 @@ This wrapper runs:
 1. remote preflight
 2. remote bootstrap
 3. post-bootstrap verification
+4. optional recurring health-monitor installation
 
 Optional machine-readable host classification:
 
@@ -70,6 +71,17 @@ If you want a fresh identity generated intentionally:
   --public-url http://<public-ip-or-dns>:53550 \
   --fresh-host \
   --identity-mode generate
+```
+
+If you want recurring sync health checks installed automatically:
+
+```bash
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
+  --install-health-monitor
 ```
 
 On `--reuse-host`, bootstrap archives replaceable state under `/var/backups/demos-fixnet` before replacing the old install.

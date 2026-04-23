@@ -5,6 +5,7 @@ The upstream DEMOS monitoring stack consists of:
 - Prometheus
 - Grafana
 - optional `node-exporter` for the full profile
+- optional recurring host-local sync health checks through a systemd timer
 
 ## Profiles
 
@@ -88,3 +89,50 @@ Only expose Grafana publicly if you first:
 3. preferably put TLS or a reverse proxy in front of it
 
 You do not need to expose `node-exporter` publicly. Prometheus scrapes it internally.
+
+## Continuous health automation
+
+For ongoing fixnet burn-in, use the recurring host-local health check.
+
+It evaluates:
+
+- `demos-node.service` active state
+- local `/info` reachability
+- local self-peer detection using the node's own identity
+- anchor reachability and expected identity
+- sync lag against the anchor
+- block progression compared to the previous check
+
+Statuses:
+
+- `healthy`: service is up and lag is inside threshold
+- `syncing`: service is up and block height is still advancing toward the anchor
+- `unhealthy` or `stalled`: service down, endpoint down, anchor mismatch, or no progress
+
+Install it directly on a host:
+
+```bash
+sudo ./scripts/install_fixnet_health_monitor.sh \
+  --anchor-url http://node3.demos.sh:60001/info \
+  --expected-anchor-identity 0x412bee5548b43bc0a23429c06946c1eb990d900f6c0ed5c3ad001481e7f7a8ef \
+  --interval-minutes 5 \
+  --max-lag 100 \
+  --run-now
+```
+
+The timer writes the latest status JSON to:
+
+```bash
+/var/lib/demos-fixnet-health/latest.json
+```
+
+If you use the wrapper from your admin machine, install it during setup with:
+
+```bash
+./scripts/setup_fixnet_vps.sh \
+  --ssh-target root@<host> \
+  --ssh-identity-file ~/.ssh/<admin-key> \
+  --public-url http://<public-ip-or-dns>:53550 \
+  --fresh-host \
+  --install-health-monitor
+```

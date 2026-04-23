@@ -104,11 +104,11 @@ import sys
 
 raw = sys.argv[1]
 data = json.loads(raw)
+identity = data.get("identity")
 peerlist = data.get("peerlist") or []
-self_peer = peerlist[0] if peerlist else {}
+self_peer = next((peer for peer in peerlist if peer.get("identity") == identity), {})
 block = self_peer.get("sync", {}).get("block")
 ready = self_peer.get("status", {}).get("ready")
-identity = data.get("identity")
 print(identity or "")
 print("" if block is None else block)
 print("" if ready is None else str(ready).lower())

@@ -22,6 +22,8 @@ jobs:
           test -f scripts/verify_fixnet_host.sh
           test -f scripts/setup_fixnet_vps.sh
           test -f scripts/test_host_state_harness.py
+          test -f scripts/check_fixnet_sync_health.sh
+          test -f scripts/install_fixnet_health_monitor.sh
           test -f scripts/run_dirty_host_integration.py
           test -f scripts/monitor_fixnet_burnin.sh
           test -f scripts/restore_archived_install.sh
@@ -44,6 +46,8 @@ jobs:
           bash -n scripts/preflight_fixnet_host.sh
           bash -n scripts/verify_fixnet_host.sh
           bash -n scripts/setup_fixnet_vps.sh
+          bash -n scripts/check_fixnet_sync_health.sh
+          bash -n scripts/install_fixnet_health_monitor.sh
           bash -n scripts/monitor_fixnet_burnin.sh
           bash -n scripts/restore_archived_install.sh
 
@@ -53,6 +57,8 @@ jobs:
           ./scripts/preflight_fixnet_host.sh --help >/dev/null
           ./scripts/verify_fixnet_host.sh --help >/dev/null
           ./scripts/setup_fixnet_vps.sh --help >/dev/null
+          ./scripts/check_fixnet_sync_health.sh --help >/dev/null
+          ./scripts/install_fixnet_health_monitor.sh --help >/dev/null
           ./scripts/monitor_fixnet_burnin.sh --help >/dev/null
           ./scripts/restore_archived_install.sh --help >/dev/null
 

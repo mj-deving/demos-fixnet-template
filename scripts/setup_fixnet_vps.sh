@@ -22,6 +22,9 @@ GRAFANA_ADMIN_PASSWORD=""
 GRAFANA_ROOT_URL=""
 ANCHOR_PUBKEY=""
 ANCHOR_URL=""
+INSTALL_HEALTH_MONITOR=false
+HEALTH_CHECK_INTERVAL_MINUTES="5"
+HEALTH_MAX_LAG="100"
 SKIP_PRECHECK=false
 SKIP_VERIFY=false
 PRINT_PREFLIGHT_JSON=false
@@ -58,6 +61,9 @@ Optional:
   --grafana-root-url http://localhost:3000
   --anchor-pubkey 0x...
   --anchor-url http://node3.demos.sh:60001
+  --install-health-monitor
+  --health-check-interval-minutes 5
+  --health-max-lag 100
   --print-preflight-json
   --preflight-report-file ./preflight.json
   --skip-precheck
@@ -112,6 +118,9 @@ GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-}"
 GRAFANA_ROOT_URL="${GRAFANA_ROOT_URL:-}"
 ANCHOR_PUBKEY="${ANCHOR_PUBKEY:-}"
 ANCHOR_URL="${ANCHOR_URL:-}"
+INSTALL_HEALTH_MONITOR="${INSTALL_HEALTH_MONITOR:-false}"
+HEALTH_CHECK_INTERVAL_MINUTES="${HEALTH_CHECK_INTERVAL_MINUTES:-5}"
+HEALTH_MAX_LAG="${HEALTH_MAX_LAG:-100}"
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -193,6 +202,18 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--anchor-url)
 		ANCHOR_URL="${2:-}"
+		shift 2
+		;;
+	--install-health-monitor)
+		INSTALL_HEALTH_MONITOR=true
+		shift
+		;;
+	--health-check-interval-minutes)
+		HEALTH_CHECK_INTERVAL_MINUTES="${2:-}"
+		shift 2
+		;;
+	--health-max-lag)
+		HEALTH_MAX_LAG="${2:-}"
 		shift 2
 		;;
 	--print-preflight-json)
@@ -334,6 +355,18 @@ fi
 
 echo "==> Running remote bootstrap"
 remote_run "${SCRIPT_DIR}/bootstrap_fixnet_host.sh" "${shared_args[@]}"
+
+if [[ "${INSTALL_HEALTH_MONITOR}" == "true" ]]; then
+	echo "==> Installing recurring health monitor"
+	health_args=(--service-name demos-node.service --local-url "http://127.0.0.1:53550/info" --interval-minutes "${HEALTH_CHECK_INTERVAL_MINUTES}" --max-lag "${HEALTH_MAX_LAG}" --run-now)
+	if [[ -n "${ANCHOR_URL}" ]]; then
+		health_args+=(--anchor-url "${ANCHOR_URL}")
+	fi
+	if [[ -n "${ANCHOR_PUBKEY}" ]]; then
+		health_args+=(--expected-anchor-identity "${ANCHOR_PUBKEY}")
+	fi
+	remote_run "${SCRIPT_DIR}/install_fixnet_health_monitor.sh" "${health_args[@]}"
+fi
 
 if [[ "${SKIP_VERIFY}" != "true" ]]; then
 	echo "==> Running post-bootstrap verification"

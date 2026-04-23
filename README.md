@@ -9,6 +9,7 @@ This repo does not contain tenant inventory, provider account automation, live f
 - a host bootstrap script
 - a post-bootstrap verifier
 - a short burn-in monitor
+- a recurring host-local sync health monitor
 - upstream-aligned monitoring support with optional full profile
 - archive restore tooling for reuse-host recovery
 - dirty-host regression harnesses for state detection
@@ -25,6 +26,7 @@ It is the provider-neutral operator toolkit for:
 - health verification
 - short burn-in observation
 - monitoring enablement
+- recurring host-local health checks
 - reuse-host archive and restore
 - regression testing for dirty-host classification behavior
 
