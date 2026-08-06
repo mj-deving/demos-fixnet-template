@@ -2,6 +2,8 @@
 
 Public, provider-neutral operator kit for bringing Linux hosts onto the DEMOS fixnet and keeping them healthy over time with setup, verification, recovery, and dirty-host regression tooling.
 
+The fixnet is the DEMOS network stage a node joins first, before it is promoted to devnet. Hosts are brought up on it, run a multi-day burn-in, and only a host that clears that gate is promoted. This kit is the operator layer for the first half of that path.
+
 This repo does not contain tenant inventory, provider account automation, live fleet data, or mnemonic material. It contains the reusable operator layer around the upstream [`kynesyslabs/node`](https://github.com/kynesyslabs/node) repository:
 
 - a one-command VPS setup wrapper
